@@ -265,7 +265,7 @@ std::pair<std::vector<IntervalTuple>, std::vector<IntervalTuple>> sivia(Inclusio
             X_minus.push_back(Xi);
             X_plus.push_back(Xi);
         } else if (Yi.is_intersection_empty(Y)) {
-            continue; // discard Xi
+            continue; // discard Xi... and all sub trees?
         } else if (Xi.largest_width() < options.epsilon) {
             X_plus.push_back(Xi);
         } else {
@@ -313,13 +313,12 @@ int main() {
     // create time variables
     double t_initial{0.1}; // first time
     double t_final{5.1}; // last time
-    double sample_time{1}; // sample time
+    double sample_time{0.5}; // sample time
     std::size_t num_samples = (std::size_t)(t_final - t_initial) / sample_time;
     std::vector<double> time(num_samples);
     for (std::size_t i = 0; i < time.size(); ++i){
         time[i] = t_initial + (double)i * sample_time;
     }
-
 
     std::function<double(double)> f = [&](double t){ return p1 * std::exp(-p2 * t); }; // system dynamics
 
@@ -336,9 +335,9 @@ int main() {
 
     // compute all the measurements Y
     std::vector<Interval> Y_vector(num_samples);
-    Interval tolerance_bounds(-0.5, 0.5);
+    Interval tolerance_bounds(0.5, 1.5);
     for (std::size_t i = 0; i < num_samples; ++i) {
-        Y_vector[i] = f(t_initial + (double)i * sample_time) + tolerance_bounds; // additive noise like this ain't accurate
+        Y_vector[i] = f(t_initial + (double)i * sample_time) * (tolerance_bounds); // additive noise like this ain't accurate
     }
     IntervalTuple Y(Y_vector); // copy...
     std::cout << Y << std::endl;
@@ -373,8 +372,6 @@ int main() {
     std::cout << X_plus.size() << std::endl;
 
     save_soln(X_minus, X_plus);
-
-
 
     return 0;
 }
