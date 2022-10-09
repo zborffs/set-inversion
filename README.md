@@ -24,14 +24,13 @@ state and control input.
 
 Obviously, there are many ways of approaching this problem. One such way is set inversion.
 
-### Effect of Signal-to-Noise Ratio (SNR) on ```X-``` Size
-What is the fundamental limitation of the size of ```X-```? Is it the amount of noise wi
-
-### Effect of ```epsilon``` on ```X-``` Size
-
-
-### Effect of ```epsilon``` on Convergence Time
-
+### Questions
+1. What is the effect of the measurements tolerances on ```X-``` region?
+2. What is the effect of the number of measurements on the ```X-``` region?
+3. What is the effect of the size of ```epsilon``` on the ```X-``` region?
+4. What is the effect of the size of ```epsilon``` on the convergence time?
+5. What is the effect of the number of parameters on convergence time?
+6. Can we implement the so-called SIVIA+ algorithm?
 
 Pros and Cons of this Approach
 ------------------------------
