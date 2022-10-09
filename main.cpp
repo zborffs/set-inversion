@@ -41,6 +41,10 @@ public:
         assert(index < tuple_.size() && index >= 0);
         return tuple_[index];
     }
+
+    Interval& at(std::size_t index) {
+        return tuple_[index];
+    }
     [[nodiscard]] std::size_t size() const {return tuple_.size();}
     std::size_t size() {return tuple_.size();}
 
@@ -127,6 +131,114 @@ public:
     }
 };
 
+/**
+ * contractor for z = x + y
+ */
+void contractor_plus(Interval& z, Interval& x, Interval& y) {
+    z = boost::numeric::intersect(z, x + y);
+    x = boost::numeric::intersect(x, z - y);
+    y = boost::numeric::intersect(y, z - x);
+}
+
+/**
+ * contractor for z = exp(x)
+ */
+void contractor_exp(Interval& z, Interval& x) {
+    z = boost::numeric::intersect(z, boost::numeric::exp(x));
+    x = boost::numeric::intersect(x, boost::numeric::log(x));
+}
+
+/**
+ * contractor for z = x * y
+ */
+void contractor_mult(Interval& z, Interval& x, Interval& y) {
+    z = boost::numeric::intersect(z, x * y);
+    x = boost::numeric::intersect(x, z / y);
+    y = boost::numeric::intersect(y, z / x);
+}
+
+/**
+ * contractor for z = x * y
+ */
+void contractor_negate(Interval& z, Interval& x) {
+    z = boost::numeric::intersect(z, -x);
+    x = boost::numeric::intersect(x, -z);
+}
+
+/**
+ * contractor for z = x * y
+ */
+void contractor_sin(Interval& z, Interval& x) {
+    z = boost::numeric::intersect(z, boost::numeric::sin(x));
+    x = boost::numeric::intersect(x, boost::numeric::asin(z));
+}
+
+void contractor_custom(Interval& x, Interval& y) {
+    Interval a(-std::numeric_limits<double>::max(), std::numeric_limits<double>::max());
+    Interval b(-std::numeric_limits<double>::max(), std::numeric_limits<double>::max());
+    Interval c(0, std::numeric_limits<double>::max());
+
+    Interval x_old;
+    Interval y_old;
+    double my_epsilon{0.1};
+    do {
+        x_old = x;
+        y_old = y;
+        contractor_mult(a, x, y); // a = x * y
+        contractor_sin(b, a); // b = sin(a) = sin(x * y)
+        contractor_plus(c, x, b); // c = x + b = x + sin(x * y)
+    } while (!(width(x_old) - width(x) < my_epsilon && width(y_old) - width(y) < my_epsilon));
+}
+
+// y is constant, because it is not contracting, it's just there to provide bounds on initial
+void contractor_system_dynamics(IntervalTuple& x, const IntervalTuple& y, const std::vector<double>& time) {
+    std::vector<Interval> a_vec(y.size());
+    for (std::size_t i = 0; i < y.size(); ++i) {
+        a_vec[i] = Interval(-std::numeric_limits<double>::max(), std::numeric_limits<double>::max());
+    }
+    IntervalTuple a(a_vec);
+
+    std::vector<Interval> b_vec(y.size());
+    for (std::size_t i = 0; i < y.size(); ++i) {
+        b_vec[i] = Interval(-std::numeric_limits<double>::max(), std::numeric_limits<double>::max());
+    }
+    IntervalTuple b(b_vec);
+
+    std::vector<Interval> c_vec(y.size());
+    for (std::size_t i = 0; i < y.size(); ++i) {
+        c_vec[i] = Interval(-std::numeric_limits<double>::max(), std::numeric_limits<double>::max());
+    }
+    IntervalTuple c(c_vec);
+
+    std::vector<Interval> d_vec(y.size());
+    for (std::size_t i = 0; i < y.size(); ++i) {
+        d_vec[i] = Interval(y[i].lower(), y[i].upper());
+    }
+    IntervalTuple d(d_vec);
+
+    std::vector<Interval> time_vec(y.size());
+    for (std::size_t i = 0; i < y.size(); ++i) {
+        time_vec[i] = Interval(time[i]);
+    }
+    IntervalTuple t(time_vec);
+
+    Interval x0_old;
+    Interval x1_old;
+    double my_epsilon{0.1};
+    do {
+        x0_old = x[0];
+        x1_old = x[1];
+
+        for (std::size_t i = 0; i < a_vec.size(); ++i) {
+            contractor_mult(a.at(i), x.at(1), t.at(i));
+            contractor_negate(b.at(i), a.at(i));
+            contractor_exp(c.at(i),  b.at(i));
+            contractor_mult(d.at(i), x.at(0), c.at(i));
+        }
+
+    } while (width(x0_old) - width(x[0])  < my_epsilon && width(x1_old) - width(x[1]) < my_epsilon);
+}
+
 
 typedef std::function<IntervalTuple(IntervalTuple&)> InclusionFunction;
 
@@ -197,10 +309,18 @@ void save_soln(std::vector<IntervalTuple> X_minus, std::vector<IntervalTuple> X_
 int main() {
     double p1{5}; // unknown parameter 1
     double p2{1}; // unknown parameter 2
-    double t_initial{0}; // first time
-    double t_final{5}; // last time
+
+    // create time variables
+    double t_initial{0.1}; // first time
+    double t_final{5.1}; // last time
     double sample_time{1}; // sample time
     std::size_t num_samples = (std::size_t)(t_final - t_initial) / sample_time;
+    std::vector<double> time(num_samples);
+    for (std::size_t i = 0; i < time.size(); ++i){
+        time[i] = t_initial + (double)i * sample_time;
+    }
+
+
     std::function<double(double)> f = [&](double t){ return p1 * std::exp(-p2 * t); }; // system dynamics
 
     // this inclusion function maps IR^2 (two parameters in parameter-space) to IR^p (p measurements in
@@ -208,7 +328,7 @@ int main() {
     InclusionFunction inclusion_function = [=](IntervalTuple& x_box) {
         std::vector<Interval> Y_vector(num_samples);
         for (std::size_t i = 0; i < num_samples; ++i) {
-            Y_vector[i] = x_box[0] * boost::numeric::exp(-x_box[1] * (t_initial + sample_time * i));
+            Y_vector[i] = x_box[0] * boost::numeric::exp(-x_box[1] * time[i]);
         }
         IntervalTuple Y_box(Y_vector);
         return Y_box;
@@ -224,8 +344,8 @@ int main() {
     std::cout << Y << std::endl;
 
     // estimate unknown parameters
-    Interval p1_0(-1, 10);
-    Interval p2_0(-1, 10);
+    Interval p1_0(0.0, 10.0); // cannot be < 0.0 otherwise unstable
+    Interval p2_0(0.0, 10.0); // cannot be < 0.0 otherwise unstable
     IntervalTuple X_0 = {p1_0, p2_0};
 
     IntervalTuple Y_box = inclusion_function(X_0);
@@ -237,6 +357,14 @@ int main() {
     // instantiate the SIVIA algorithm options
     sivia_options options{0.1};
 
+    std::cout << "Before Contraction:" << std::endl;
+    std::cout << "X_0 = \n" << X_0;
+    std::cout << "Y = \n" << Y << std::endl;
+    contractor_system_dynamics(X_0, Y, time);
+    std::cout << "After Contraction:" << std::endl;
+    std::cout << "X_0 = \n" << X_0;
+    std::cout << "Y = \n" << Y << std::endl;
+
     // run SIVIA algorithm
     auto [X_minus, X_plus] = sivia(inclusion_function, X_0, Y, options);
 
@@ -245,6 +373,8 @@ int main() {
     std::cout << X_plus.size() << std::endl;
 
     save_soln(X_minus, X_plus);
+
+
 
     return 0;
 }
