@@ -29,8 +29,9 @@ private:
     std::vector<Interval> tuple_;
 
 public:
-    // anti-pattern with <double>... not generic
+    explicit IntervalTuple(std::vector<Interval>& v) : tuple_(v) {}
     IntervalTuple(std::initializer_list<Interval> l) : tuple_(l) {}
+
     Interval operator[](std::size_t index) const { // doesn't check bounds...
         assert(index < tuple_.size() && index >= 0);
         return tuple_[index];
@@ -166,8 +167,8 @@ std::pair<std::vector<IntervalTuple>, std::vector<IntervalTuple>> sivia(Inclusio
 }
 
 void save_soln(std::vector<IntervalTuple> X_minus, std::vector<IntervalTuple> X_plus) {
-    std::string X_minus_filename = "xminus.txt";
-    std::string X_plus_filename = "xplus.txt";
+    std::string X_minus_filename = "../xminus.txt";
+    std::string X_plus_filename = "../xplus.txt";
 
     // create file obj and open file
     std::ofstream outfile;
@@ -191,71 +192,55 @@ void save_soln(std::vector<IntervalTuple> X_minus, std::vector<IntervalTuple> X_
         outfile << x << " " << y << " " << w << " " << h << "\n";
     }
     outfile.close();
-
-    // save every element of each vector, where the Interval Tuple (members of IR^2) is [X_minus[i][0].lower(), X_minus[i][1].lower(), X_minus[i][0].width(), X_minus[i][1].width()]
-
 }
 
 int main() {
     double p1{5}; // unknown parameter 1
     double p2{1}; // unknown parameter 2
-    double t1{0}; // time 1
-    double t2{5}; // time 2
-    double t3{10}; // time 3
-    std::function<double(double)> my_system = [&](double t){ return p1 * std::exp(-p2 * t); }; // system dynamics
+    double t_initial{0}; // first time
+    double t_final{5}; // last time
+    double sample_time{1}; // sample time
+    std::size_t num_samples = (std::size_t)(t_final - t_initial) / sample_time;
+    std::function<double(double)> f = [&](double t){ return p1 * std::exp(-p2 * t); }; // system dynamics
 
-    // three measurements with fixed uncertainties, which are represented as tolerance bounds (i.e. intervals)
-    Interval y1(my_system(0) - 1,my_system(0) + 1);
-    Interval y2(my_system(5) - 1,my_system(5) + 1);
-    Interval y3(my_system(10) - 1,my_system(10) + 1);
-
-    // print the measurements (y1, y2, y3)
-    std::cout << to_string(y1) << std::endl;
-    std::cout << to_string(y2) << std::endl;
-    std::cout << to_string(y3) << std::endl;
-    IntervalTuple y_box = {y1, y2, y2};
-
-    // determine the inclusion function of the system function
-    std::function<Interval(double, Interval&, Interval&)> my_system2 = [](double t, Interval& p1, Interval& p2){
-        return p1 * exp(p2 * t); // same thing as system function but p1 and p2 are "interval" types now
+    // this inclusion function maps IR^2 (two parameters in parameter-space) to IR^p (p measurements in
+    // measurement-space); it's the inclusion function analog to the system dynamics.
+    InclusionFunction inclusion_function = [=](IntervalTuple& x_box) {
+        std::vector<Interval> Y_vector(num_samples);
+        for (std::size_t i = 0; i < num_samples; ++i) {
+            Y_vector[i] = x_box[0] * boost::numeric::exp(-x_box[1] * (t_initial + sample_time * i));
+        }
+        IntervalTuple Y_box(Y_vector);
+        return Y_box;
     };
 
-    // initialize parameter guess
-    Interval p1_initial_guess(-1, 7);
-    Interval p2_initial_guess(-1, 2);
-    auto resp1 = my_system2(0, p1_initial_guess, p2_initial_guess);
-    auto resp2 = my_system2(5, p1_initial_guess, p2_initial_guess);
-    auto resp3 = my_system2(10, p1_initial_guess, p2_initial_guess);
-    std::cout << to_string(resp1) << std::endl;
-    std::cout << to_string(resp2) << std::endl;
-    std::cout << to_string(resp3) << std::endl;
+    // compute all the measurements Y
+    std::vector<Interval> Y_vector(num_samples);
+    Interval tolerance_bounds(-0.5, 0.5);
+    for (std::size_t i = 0; i < num_samples; ++i) {
+        Y_vector[i] = f(t_initial + (double)i * sample_time) + tolerance_bounds; // additive noise like this ain't accurate
+    }
+    IntervalTuple Y(Y_vector); // copy...
+    std::cout << Y << std::endl;
 
-    IntervalTuple resp_box = {resp1, resp2, resp3};
+    // estimate unknown parameters
+    Interval p1_0(-1, 10);
+    Interval p2_0(-1, 10);
+    IntervalTuple X_0 = {p1_0, p2_0};
 
-    std::cout << std::boolalpha << "resp_box is subset of y_box: " << resp_box.is_subset(y_box) << std::endl;
-    std::cout << std::boolalpha << "resp_box intersect y_box is empty set: " << resp_box.is_intersection_empty(y_box) << std::endl;
-    std::cout << std::boolalpha << "y_box is subset of resp_box: " << y_box.is_subset(resp_box) << std::endl;
+    IntervalTuple Y_box = inclusion_function(X_0);
+//    std::cout << Y_box << std::endl;
 
-    auto [lower, upper] = resp_box.bisect();
-    std::cout << "lower: \n" << lower << std::endl;
-    std::cout << "upper: \n" << upper << std::endl;
+    // Is Y subset of [f]([x0])? If not, then the algorithm is not sound... so widen intervals of [x0].
+    std::cout << std::boolalpha << "Y is subset of Y_box: " << Y.is_subset(Y_box) << std::endl;
 
+    // instantiate the SIVIA algorithm options
+    sivia_options options{0.1};
 
-    // this inclusion function maps IR^2 (two parameters in parameter-space) to IR^3 (3 measurements in
-    // measurement-space...
-    InclusionFunction inclusion_function = [t1, t2, t3](IntervalTuple& x_box) {
-        auto y_interval1 = x_box[0] * boost::numeric::exp(-x_box[1] * t1);
-        auto y_interval2 = x_box[0] * boost::numeric::exp(-x_box[1] * t2);
-        auto y_interval3 = x_box[0] * boost::numeric::exp(-x_box[1] * t3);
-        IntervalTuple y_box = {y_interval1, y_interval2, y_interval3};
-        return y_box;
-    };
-
-    IntervalTuple X_0 = {p1_initial_guess, p2_initial_guess};
-    IntervalTuple Y = {y1, y2, y3};
-    sivia_options options; options.epsilon = 0.1;
+    // run SIVIA algorithm
     auto [X_minus, X_plus] = sivia(inclusion_function, X_0, Y, options);
 
+    // Count the number of elements in Xminus and Xplus (to check that soln btw runs are equal)...
     std::cout << X_minus.size() << std::endl;
     std::cout << X_plus.size() << std::endl;
 
