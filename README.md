@@ -37,8 +37,8 @@ Contractors are the key to making the SIVIA approach efficient.
 
 Contractors are functions ```C: IR^n -> IR^n```, where ```IR``` represents the interval real number space. 
 
-They have two properties: (1) so-called "contractance" property ```C([x]) &sub; [x]```, and (2) so-called 
-"completeness" property ```C([x]) &cap; X = [x] &cap; X```.
+They have two properties: (1) so-called "contractance" property ```C([x]) ⊂ [x]```, and (2) so-called 
+"completeness" property ```C([x]) ∩ X = [x] ∩ X```.
 
 The details of constructing contractors is not hard to understand, but involves many steps. So, I will not try to spell
 out how contractors are constructed here. The source code has some examples.
