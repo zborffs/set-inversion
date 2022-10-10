@@ -67,7 +67,7 @@ parameter-space though.
 
 References
 ----------
-[1] https://en.wikipedia.org/wiki/Set_estimation
-[2] https://en.wikipedia.org/wiki/Set_inversion
-[3] https://www.youtube.com/c/OlivierReynet (this guy is the best)
-[4] https://www.boost.org/doc/libs/1_66_0/libs/numeric/interval/doc/interval.htm#intro
+1. https://en.wikipedia.org/wiki/Set_estimation
+2. https://en.wikipedia.org/wiki/Set_inversion
+3. https://www.youtube.com/c/OlivierReynet (this guy is the best)
+4. https://www.boost.org/doc/libs/1_66_0/libs/numeric/interval/doc/interval.htm#intro
