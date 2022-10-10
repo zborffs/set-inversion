@@ -30,7 +30,14 @@ Obviously, there are many ways of approaching this problem. One such way is set 
 3. What is the effect of the size of ```epsilon``` on the ```X-``` region?
 4. What is the effect of the size of ```epsilon``` on the convergence time?
 5. What is the effect of the number of parameters on convergence time?
-6. Can we implement the so-called SIVIA+ algorithm?
+6. Can we implement the so-called SIVIA-Contractors algorithm?
+
+Contractors
+-----------
+- Use the same algorithm as before, but rather than bisecting, bisect a contracted quantity.
+- contractors use structure of dynamics along with history of measurements close in on better guess...
+- need to refactor to clean some stuff up
+
 
 Pros and Cons of this Approach
 ------------------------------
