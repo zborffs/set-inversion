@@ -2,19 +2,20 @@ clear; clc;
 
 %% Plot Solution
 % Read 'Xminus' and 'Xplus' returned by program from .txt files
-Xminus = readmatrix('xminus.txt');%idx  = isnan(Xminus); Xminus(idx,:) = [];
-Xplus = readmatrix('xplus.txt');%idx  = isnan(Xplus); Xplus(idx,:) = [];
+Xminus = readmatrix('xminus.txt');
+Xplus = readmatrix('xplus.txt');
 
 
 % Draw the 'Xplus' region red
 for i = 1:size(Xplus, 1)
-    rectangle('Position', Xplus(i,:), 'FaceColor', [1 0.5 0.5],'EdgeColor', [0 0 0]);
+    rectangle('Position', Xplus(i,:), 'FaceColor', 'k', 'EdgeColor', 'k');
 end
 
 % Draw the 'Xminus' region green (overlap Xplus region)
 for i = 1:size(Xminus, 1)
-    rectangle('Position', Xminus(i,:), 'FaceColor', [0.5 1 0.5],'EdgeColor', [0 0 0]);
+    rectangle('Position', Xminus(i,:), 'FaceColor', [0 1 0], 'EdgeColor', 'w');
 end
+xlabel("Parameter 1"); ylabel("Parameter 2"); title("SIVIA \epsilon=0.1"); fontsize(gcf, scale=1.2);
 
 
 % Limit the x- and y-axes
