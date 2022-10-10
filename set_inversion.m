@@ -2,8 +2,9 @@ clear; clc;
 
 %% Plot Solution
 % Read 'Xminus' and 'Xplus' returned by program from .txt files
-Xminus = readmatrix('xminus.txt');
-Xplus = readmatrix('xplus.txt');
+Xminus = readmatrix('xminus.txt');%idx  = isnan(Xminus); Xminus(idx,:) = [];
+Xplus = readmatrix('xplus.txt');%idx  = isnan(Xplus); Xplus(idx,:) = [];
+
 
 % Draw the 'Xplus' region red
 for i = 1:size(Xplus, 1)

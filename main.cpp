@@ -161,8 +161,8 @@ void contractor_mult(Interval& z, Interval& x, Interval& y) {
  * contractor for z = x * y
  */
 void contractor_negate(Interval& z, Interval& x) {
-    z = boost::numeric::intersect(z, -x);
-    x = boost::numeric::intersect(x, -z);
+    z = -x;
+    x = -z;
 }
 
 /**
@@ -235,8 +235,7 @@ void contractor_system_dynamics(IntervalTuple& x, const IntervalTuple& y, const 
             contractor_exp(c.at(i),  b.at(i));
             contractor_mult(d.at(i), x.at(0), c.at(i));
         }
-
-    } while (width(x0_old) - width(x[0])  < my_epsilon && width(x1_old) - width(x[1]) < my_epsilon);
+    } while (!(width(x0_old) - width(x[0]) < my_epsilon && width(x1_old) - width(x[1]) < my_epsilon));
 }
 
 
@@ -244,6 +243,7 @@ typedef std::function<IntervalTuple(IntervalTuple&)> InclusionFunction;
 
 struct sivia_options {
     double epsilon;
+    std::function<void(IntervalTuple&, const IntervalTuple&)> contractor;
 };
 
 // we need an inclusion function, an initial guess x0 (represented by an IntervalTuple in IR^n), and we need a set Y
@@ -269,9 +269,31 @@ std::pair<std::vector<IntervalTuple>, std::vector<IntervalTuple>> sivia(Inclusio
         } else if (Xi.largest_width() < options.epsilon) {
             X_plus.push_back(Xi);
         } else {
+            options.contractor(Xi, Y);
             auto [X_lower, X_upper] = Xi.bisect();
-            L.push_back(X_lower);
-            L.push_back(X_upper);
+
+            // don't add the X_lower or X_upper bounds IntervalTuples if any underlying Interval contains nan as bound
+            bool add_lower{true};
+            for (std::size_t i = 0; i < X_lower.size(); ++i) {
+                if (isnan(X_lower[i].lower()) || isnan(X_lower[i].upper())) {
+                    add_lower = false;
+                }
+            }
+
+            bool add_upper{true};
+            for (std::size_t i = 0; i < X_upper.size(); ++i) {
+                if (isnan(X_upper[i].lower()) || isnan(X_upper[i].upper())) {
+                    add_upper = false;
+                }
+            }
+
+            if (add_lower) {
+                L.push_back(X_lower);
+            }
+
+            if (add_upper) {
+                L.push_back(X_upper);
+            }
         }
     }
 
@@ -335,7 +357,7 @@ int main() {
 
     // compute all the measurements Y
     std::vector<Interval> Y_vector(num_samples);
-    Interval tolerance_bounds(0.5, 1.5);
+    Interval tolerance_bounds(0.6, 1.4);
     for (std::size_t i = 0; i < num_samples; ++i) {
         Y_vector[i] = f(t_initial + (double)i * sample_time) * (tolerance_bounds); // additive noise like this ain't accurate
     }
@@ -343,8 +365,8 @@ int main() {
     std::cout << Y << std::endl;
 
     // estimate unknown parameters
-    Interval p1_0(0.0, 10.0); // cannot be < 0.0 otherwise unstable
-    Interval p2_0(0.0, 10.0); // cannot be < 0.0 otherwise unstable
+    Interval p1_0(0, 10.0); // cannot be < 0.0 otherwise unstable
+    Interval p2_0(0, 10.0); // cannot be < 0.0 otherwise unstable
     IntervalTuple X_0 = {p1_0, p2_0};
 
     IntervalTuple Y_box = inclusion_function(X_0);
@@ -353,16 +375,18 @@ int main() {
     // Is Y subset of [f]([x0])? If not, then the algorithm is not sound... so widen intervals of [x0].
     std::cout << std::boolalpha << "Y is subset of Y_box: " << Y.is_subset(Y_box) << std::endl;
 
-    // instantiate the SIVIA algorithm options
-    sivia_options options{0.1};
-
+    // Try contracting initial guess
+    std::function<void(IntervalTuple&, const IntervalTuple&)> contractor = std::bind(&contractor_system_dynamics, std::placeholders::_1, std::placeholders::_2, time);
     std::cout << "Before Contraction:" << std::endl;
     std::cout << "X_0 = \n" << X_0;
     std::cout << "Y = \n" << Y << std::endl;
-    contractor_system_dynamics(X_0, Y, time);
+    contractor(X_0, Y);
     std::cout << "After Contraction:" << std::endl;
     std::cout << "X_0 = \n" << X_0;
     std::cout << "Y = \n" << Y << std::endl;
+
+    // instantiate the SIVIA algorithm options
+    sivia_options options{0.1, contractor};
 
     // run SIVIA algorithm
     auto [X_minus, X_plus] = sivia(inclusion_function, X_0, Y, options);
