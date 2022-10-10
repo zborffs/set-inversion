@@ -386,7 +386,7 @@ int main() {
     std::cout << "Y = \n" << Y << std::endl;
 
     // instantiate the SIVIA algorithm options
-    sivia_options options{0.1, contractor};
+    sivia_options options{0.005, contractor};
 
     // run SIVIA algorithm
     auto [X_minus, X_plus] = sivia(inclusion_function, X_0, Y, options);

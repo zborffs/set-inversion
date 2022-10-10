@@ -65,3 +65,9 @@ parameter-space though.
       solution, which the algorithm returns, contains solutions that are not the "true" X. However, it is possible to
       tighten the lower- and upper-bounds of ```X``` to be arbitrarily small.
 
+References
+----------
+[1] https://en.wikipedia.org/wiki/Set_estimation
+[2] https://en.wikipedia.org/wiki/Set_inversion
+[3] https://www.youtube.com/c/OlivierReynet (this guy is the best)
+[4] https://www.boost.org/doc/libs/1_66_0/libs/numeric/interval/doc/interval.htm#intro

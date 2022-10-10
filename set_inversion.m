@@ -15,7 +15,7 @@ end
 for i = 1:size(Xminus, 1)
     rectangle('Position', Xminus(i,:), 'FaceColor', [0 1 0], 'EdgeColor', 'w');
 end
-xlabel("Parameter 1"); ylabel("Parameter 2"); title("SIVIA \epsilon=0.1"); fontsize(gcf, scale=1.2);
+xlabel("Parameter 1"); ylabel("Parameter 2"); title("SIVIA \epsilon=0.005"); fontsize(gcf, scale=1.2);
 
 
 % Limit the x- and y-axes
